@@ -1,84 +1,68 @@
-use std::{fs::File, error::Error, io::{Read, Write, BufWriter}, path::Path, fmt::format};
+mod converter;
+
+use std::{fs::ReadDir, error::Error};
+use std::fs;
 
 fn main() {
     let data = std::env::args().collect::<Vec<String>>();
     match data.get(1).map(|a| a.as_str()) {
         Some(a) => {
             if a.ends_with(".lang") {
-                match to_json(a) {
-                    Ok(_) => {
-                        println!("Finished");
-                    },
-                    Err(e) => {
-                        println!("{}", e);
-                    },
-                }
+                finish_or_errorlog!(converter::to_json(a));
             } else if a.ends_with(".json") {
-                todo!()
+                finish_or_errorlog!(converter::to_lang(a));
             } else {
-                let path = Path::new(a);
-                for a in path {
-                    println!("{:?}", a);
-                }
-                todo!("フォルダ内のすべてのファイルを変換する処理")
+                finish_or_errorlog!(conv_all(a));
             }
         },
         None => show_help()
     }
 }
 
-fn show_help() {
-    println!(".lang ファイルまたは .json ファイルを指定してください。");
+#[macro_export]
+macro_rules! finish_or_errorlog {
+    ($func: expr) => {
+        match $func {
+            Ok(_) => {
+                println!("変換が終了しました。");
+            },
+            Err(e) => {
+                println!("{}", e);
+            },
+        }
+    };
 }
 
-fn to_json(path: &str) -> Result<(), Box<dyn Error>> {
-    let mut data: String = String::new();
-    let mut prev = File::open(path)?;
-    let new = File::create({
-        let mut data = path.chars().collect::<Vec<char>>();
-        data.pop(); data.pop(); data.pop(); data.pop();
-        format!("{}json", String::from_iter(data))
-    })?;
-    let mut stream = BufWriter::new(new);
-    prev.read_to_string(&mut data)?;
-    let mut key = String::new();
-    let mut value = String::new();
-    let mut flag;
-    let mut t = true;
-    let mut iter = data.chars();
-    write!(stream, "{{")?;
-    'outer: loop {
-        flag = false;
-        loop {
-            if let Some(c) = iter.next() {
-                match c {
-                    '\n' | '\r' => {
-                        break;
-                    }
-                    '=' => {
-                        flag = true;
-                    }
-                    _ => {
-                        if flag {
-                            value.push(c);
-                        } else {
-                            key.push(c);
+fn show_help() {
+    println!(".lang ファイルまたは .json ファイル, またはそれらを含むフォルダを指定してください。");
+}
+
+fn conv_all(path: &str) -> Result<(), Box<dyn Error>> {
+    let tmp = fs::read_dir(path)?;
+    let mut file_stack = Vec::<String>::new();
+    let mut dir_stack = Vec::<ReadDir>::new();
+    dir_stack.push(tmp);
+    while !dir_stack.is_empty() {
+        for a in dir_stack.pop().unwrap() {
+            match a {
+                Ok(d) => {
+                    let ft = d.file_type()?;
+                    let name = d.path().to_string_lossy().into_owned();
+                    if ft.is_file() {
+                        if name.ends_with(".lang") || name.ends_with(".json") {
+                            file_stack.push(name);
                         }
+                    } else if ft.is_dir() {
+                        dir_stack.push(fs::read_dir(name)?);
                     }
-                }
-            } else {
-                if flag {
-                    write!(stream, "{}\n    {:?}:{:?}", if t {""} else {","}, key, value)?;
-                }
-                break 'outer;
+                },
+                Err(e) => return Err(Box::new(e)),
             }
         }
-        if flag {
-            write!(stream, "{}\n    {:?}:{:?}", if t {t = false; ""} else {","}, key, value)?;
-        }
-        key.clear();
-        value.clear();
     }
-    write!(stream, "\n}}")?;
+    for a in file_stack {
+        println!("変換中: {}", a);
+        converter::to_json(a.as_str())?;
+    }
     return Ok(());
 }

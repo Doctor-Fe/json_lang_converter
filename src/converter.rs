@@ -67,7 +67,7 @@ pub fn to_lang(path: &str) -> Result<(), Box<dyn Error>> {
     let mut flag;
     let mut iter = data.chars();
     'outer: loop {
-        flag = false;
+        flag = 0;
         loop {
             if let Some(c) = iter.next() {
                 match c {
@@ -75,18 +75,21 @@ pub fn to_lang(path: &str) -> Result<(), Box<dyn Error>> {
                         break;
                     }
                     ':' => {
-                        flag = true;
+                        flag += 1;
+                    },
+                    '"' => {
+                        flag += 1;
                     }
                     _ => {
-                        if flag {
+                        if flag == 1 {
                             value.push(c);
-                        } else {
+                        } else if flag == 4 {
                             key.push(c);
                         }
                     }
                 }
             } else {
-                if flag {
+                if flag == 5 {
                     let key = key.trim().trim_start_matches("{").trim().trim_matches('"');
                     let value = value.trim_end_matches("}").trim().trim_matches('"');
                     write!(stream, "\n{}={}", key, value)?;
@@ -94,7 +97,7 @@ pub fn to_lang(path: &str) -> Result<(), Box<dyn Error>> {
                 break 'outer;
             }
         }
-        if flag {
+        if flag == 5 {
             let key = key.trim().trim_matches('"');
             let value = value.trim().trim_matches('"');
             write!(stream, "\n{}={}", key, value)?;

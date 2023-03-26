@@ -39,7 +39,8 @@ fn show_help() {
 
 fn conv_all(path: &str) -> Result<(), Box<dyn Error>> {
     let tmp = fs::read_dir(path)?;
-    let mut file_stack = Vec::<String>::new();
+    let mut file_stack1 = Vec::<String>::new();
+    let mut file_stack2 = Vec::<String>::new();
     let mut dir_stack = Vec::<ReadDir>::new();
     dir_stack.push(tmp);
     while !dir_stack.is_empty() {
@@ -49,8 +50,10 @@ fn conv_all(path: &str) -> Result<(), Box<dyn Error>> {
                     let ft = d.file_type()?;
                     let name = d.path().to_string_lossy().into_owned();
                     if ft.is_file() {
-                        if name.ends_with(".lang") || name.ends_with(".json") {
-                            file_stack.push(name);
+                        if name.ends_with(".lang") {
+                            file_stack1.push(name);
+                        } else if name.ends_with(".json") {
+                            file_stack2.push(name);
                         }
                     } else if ft.is_dir() {
                         dir_stack.push(fs::read_dir(name)?);
@@ -60,9 +63,13 @@ fn conv_all(path: &str) -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    for a in file_stack {
+    for a in file_stack1 {
         println!("変換中: {}", a);
         converter::to_json(a.as_str())?;
+    }
+    for a in file_stack2 {
+        println!("変換中: {}", a);
+        converter::to_lang(a.as_str())?;
     }
     return Ok(());
 }

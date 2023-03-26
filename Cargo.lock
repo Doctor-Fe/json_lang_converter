@@ -4,4 +4,4 @@ version = 3
 
 [[package]]
 name = "json_lang_converter"
-version = "0.1.1"
+version = "0.1.2"
